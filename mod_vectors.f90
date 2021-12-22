@@ -143,13 +143,10 @@
     integer :: n, i
         n = size(v)
         allocate(D(n,n))
-        do i=1, n
-            D(:,i) = 0d0
+        D = 0d0
+        forall(i=1:n)
             D(i,i) = v(i)
-        end do
-        !D(:,1) = [v(1),0d0,0d0]
-        !D(:,2) = [0d0,v(2),0d0]
-        !D(:,3) = [0d0,0d0,v(3)]
+        end forall
 	end function
     
     pure function D_diag(D) result(v)
@@ -158,13 +155,10 @@
     real(wp), allocatable :: v(:)
     integer :: n,i
         n = min(size(D,1),size(D,2))
-        allocate(v(n))
+        allocate(v(n))        
         do i=1,n
             v(i) = D(i,i)
         end do
-        !v(1) = D(1,1)
-        !v(2) = D(2,2)
-        !v(3) = D(3,3)
     end function
     
     pure function v_matmul(A, v) result(w)
