@@ -41,6 +41,10 @@
     ! iter=2097152, kfps=1330.5, time=9.457         <seq> - Native
     ! iter=2097152, kfps=1574.6, time=7.991         <mom> - Momentum state
     ! iter=2097152, kfps=1885.4, time=6.674         <Qipo> - Interprocedureal Optimization
+    
+     !  TIME           L_X           L_Y           L_Z            H_X           H_Y           H_Z
+     !0.0000      0.00         0.500          0.00          0.242E-02    -0.113E-19    -0.145E-03
+     !1.0000      0.00          0.00          0.00          0.242E-02    -0.113E-19    -0.145E-03    
     contains
     
     subroutine show_momentum_head()

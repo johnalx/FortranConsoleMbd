@@ -350,3 +350,7 @@ MigrationBackup/
 
 *.u2d
 /ipo_out.asm
+
+*.vtuneproj
+
+VTune Profiler Results/
