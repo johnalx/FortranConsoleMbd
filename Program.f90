@@ -8,15 +8,16 @@
     integer :: i,n, steps, iter
     real(wp) :: theta, h, t_end,fps, time
     integer(li) :: tic,toc,rate
+    type(rigidbody):: rb
 
     ! Body of FortranConsoleMbd
     n = 6
-    sim = world(n, body_cylinder(m=0.05_wp, r=0.02_wp, h=0.05_wp))
+    rb = body_cylinder(m=0.05_wp, r=0.02_wp, h=0.05_wp)
+    sim = world(n, rb)
     do i=1, n
         theta = (pi*(i-1))/(n-1)
         sim%current(i)%ori = rot(i_, pi/2) .o. rot(k_, theta)
-        sim%current(i)%vee = 10.0_wp * j_
-        sim%current(i)%omg = 50*pi*i_ - 3*pi*k_
+        call rb%set_motion(sim%current(i), motion(10.0_wp * j_, 50*pi*i_ - 3*pi*k_))
     end do
     
     t_end = 1.0_wp
@@ -38,8 +39,12 @@
     fps = (iter*n)/time
     print '(a,i0,a,f0.1,a,f0.3)', 'iter=', iter, ', kfps=', fps/1000, ', time=', time
     ! iter=2097152, kfps=1330.5, time=9.457         <seq> - Native
-    ! iter=2097152, kfps=675.0, time=18.641         <omp> - OpenMP parallelism
-    ! iter=2097152, kfps=1842.3, time=6.830         <Qipo> - Interprocedureal Optimization
+    ! iter=2097152, kfps=1574.6, time=7.991         <mom> - Momentum state
+    ! iter=2097152, kfps=1885.4, time=6.674         <Qipo> - Interprocedureal Optimization
+    
+     !  TIME           L_X           L_Y           L_Z            H_X           H_Y           H_Z
+     !0.0000      0.00         0.500          0.00          0.242E-02    -0.113E-19    -0.145E-03
+     !1.0000      0.00          0.00          0.00          0.242E-02    -0.113E-19    -0.145E-03    
     contains
     
     subroutine show_momentum_head()
@@ -48,10 +53,8 @@
     subroutine show_momentum(sim, k)
     type(world), intent(in) :: sim
     integer, intent(in) :: k
-    type(loading), allocatable :: mom(:)
     type(loading) :: H
-        mom = sim%momentum(sim%current)
-        H = mom(k)
+        H = loading(sim%current(k)%mom, sim%current(k)%agl)
         print '(f7.4,1x,3(g13.3,1x),1x,3(g13.3,1x))', sim%time, H%force, H%torque
     end subroutine
     
@@ -61,7 +64,11 @@
     subroutine show_pos(sim,k)
     type(world), intent(in) :: sim
     integer, intent(in) :: k    
-        print '(f7.4,1x,3(f13.3,1x),1x,3(f13.3,1x))', sim%time, sim%current(k)%pos, sim%current(k)%vee
+    type(state) :: st
+    type(motion) :: v
+        st = sim%current(k)
+        v = sim%bodies(k)%motion(st)
+        print '(f7.4,1x,3(f13.3,1x),1x,3(f13.3,1x))', sim%time, st%pos, v%vee
     end subroutine
     subroutine show_ori_head()
         print '(a7,1x,4(a13,1x),1x,3(a13,1x))', "TIME", "Q_X", "Q_Y", "Q_Z", "Q_W", "W_X", "W_Y", "W_Z"
@@ -69,7 +76,11 @@
     subroutine show_ori(sim, k)
     type(world), intent(in) :: sim
     integer, intent(in) :: k    
-        print '(f7.4,1x,4(f13.3,1x),1x,3(f13.3,1x))', sim%time, sim%current(k)%ori, sim%current(k)%omg
+    type(state) :: st
+    type(motion) :: v
+        st = sim%current(k)
+        v = sim%bodies(k)%motion(st)
+        print '(f7.4,1x,4(f13.3,1x),1x,3(f13.3,1x))', sim%time, st%ori, v%omg
     end subroutine
     
     subroutine show_mag_head()
@@ -79,50 +90,12 @@
     type(world), intent(in) :: sim
     integer, intent(in) :: k    
     type(state) :: st
+    type(motion) :: v
         st = sim%current(k)
-        print '(f7.4,1x,*(f13.3,1x))', sim%time, norm2(st%pos), norm2(st%ori), norm2(st%vee), norm2(st%omg)
-    end subroutine
-
-    subroutine helloworld_omp()
-    use omp_lib
-    integer :: id, threads
-    !$omp parallel
-    threads = omp_get_num_threads()
-    id = omp_get_thread_num()
-
-    print *, 'Hello World', id, '/', threads
-
-    !$omp end parallel 
+        v = sim%bodies(k)%motion(st)
+        print '(f7.4,1x,*(f13.3,1x))', sim%time, norm2(st%pos), norm2(st%ori), norm2(v%vee), norm2(v%omg)
     end subroutine
     
-    function matvec(A,x) result(y)
-    use omp_lib
-    real(wp), intent(in) :: A(:,:), x(:)
-    real(wp), allocatable :: y(:)
-    integer :: i,k, n,m
-    integer :: id, threads
-    reaL(wp) :: tmp
-        n = size(A,1)
-        m = size(A,2)
-        allocate(y(n))
-        !$omp parallel private(id)
-        threads = omp_get_num_threads()
-        id = omp_get_thread_num()
-        print *, 'Start ', id, '/', threads
-        !$omp do private(i,k) reduction(+:tmp)
-        do i=1, n
-            tmp = 0.0_wp
-            do k=1, m
-                tmp = tmp + A(i,k) * x(k)
-            end do
-            !$omp critical(dosum)
-            y(i) = tmp
-            !$omp end critical(dosum)
-        end do
-        !$omp end do
-        print *, 'End ', id, '/', threads
-        !$omp end parallel
-    end function
 
     end program FortranConsoleMbd
 

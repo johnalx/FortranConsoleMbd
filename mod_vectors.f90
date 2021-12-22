@@ -2,6 +2,8 @@
     use, intrinsic :: iso_fortran_env, only : sp=>real32, wp => real64, li => int64
     implicit none ( type, external )
     
+    integer, parameter :: dims = 3
+    
     real(wp), parameter :: nan64 =  transfer(-2251799813685248_li, 1._wp)
     real(wp), parameter :: pi = 4d0*atan(1d0), deg = pi/180d0
     reaL(wp), parameter :: o_(3) = [0d0,0d0,0d0]
@@ -9,7 +11,7 @@
     reaL(wp), parameter :: j_(3) = [0d0,1d0,0d0]
     reaL(wp), parameter :: k_(3) = [0d0,0d0,1d0]
     real(wp), parameter :: eye3(3,3) = reshape([i_,j_,k_],[3,3])
-    
+        
     interface eye
         procedure a_identity, a_elemental, v_elemental
     end interface    
@@ -143,13 +145,10 @@
     integer :: n, i
         n = size(v)
         allocate(D(n,n))
-        do i=1, n
-            D(:,i) = 0d0
+        D = 0d0
+        forall(i=1:n)
             D(i,i) = v(i)
-        end do
-        !D(:,1) = [v(1),0d0,0d0]
-        !D(:,2) = [0d0,v(2),0d0]
-        !D(:,3) = [0d0,0d0,v(3)]
+        end forall
 	end function
     
     pure function D_diag(D) result(v)
@@ -158,13 +157,10 @@
     real(wp), allocatable :: v(:)
     integer :: n,i
         n = min(size(D,1),size(D,2))
-        allocate(v(n))
+        allocate(v(n))        
         do i=1,n
             v(i) = D(i,i)
         end do
-        !v(1) = D(1,1)
-        !v(2) = D(2,2)
-        !v(3) = D(3,3)
     end function
     
     pure function v_matmul(A, v) result(w)
