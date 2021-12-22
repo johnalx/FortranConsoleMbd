@@ -61,6 +61,7 @@
         vx = v_cross_op(v)
         vxvx = -v_mmoi(v)
         R = eye3 + 2*s*vx + 2*vxvx
+        !R = eye3 + 2*matmul( s*eye3 + vx, vx)
     end function
 
     pure function q_inv(q) result(qi)

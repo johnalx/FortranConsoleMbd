@@ -11,6 +11,7 @@
         procedure :: inertia => body_get_inertia
         procedure :: motion => body_get_motion
         procedure :: set_motion => body_set_motion
+        procedure :: rate => body_calc_rate
     end type rigidbody
     
     type state
@@ -160,17 +161,24 @@
     class(rigidbody), intent(in) :: rb
     real(wp), intent(in) :: rot(3,3)
     logical, optional, intent(in) :: inverse
-    real(wp) :: I(3,3)
+    real(wp) :: I(3,3), A(3,3), d(3)
         if( present(inverse) .and. inverse) then
-            I = reshape( [1/rb%mmoi(1), 0.0_wp, 0.0_wp, &
-                0.0_wp, 1/rb%mmoi(2), 0.0_wp, &
-                0.0_wp, 0.0_wp, 1/rb%mmoi(3)], [3,3] )            
+            d = 1/rb%mmoi
+            !I = reshape( [1/rb%mmoi(1), 0.0_wp, 0.0_wp, &
+            !    0.0_wp, 1/rb%mmoi(2), 0.0_wp, &
+            !    0.0_wp, 0.0_wp, 1/rb%mmoi(3)], [3,3] )            
         else
-            I = reshape( [rb%mmoi(1), 0.0_wp, 0.0_wp, &
-                0.0_wp, rb%mmoi(2), 0.0_wp, &
-                0.0_wp, 0.0_wp, rb%mmoi(3)], [3,3] )            
+            d = rb%mmoi
+            !I = reshape( [rb%mmoi(1), 0.0_wp, 0.0_wp, &
+            !    0.0_wp, rb%mmoi(2), 0.0_wp, &
+            !    0.0_wp, 0.0_wp, rb%mmoi(3)], [3,3] )            
         end if
-        I = matmul(rot, matmul(I, transpose(rot)))
+        ! A = I*tr(rot)
+        A(:, 1) = d * rot(1, :)
+        A(:, 2) = d * rot(2, :)
+        A(:, 3) = d * rot(3, :)
+        ! I = matmul(rot, matmul(I, transpose(rot)))
+        I = matmul(rot, A)
     end function
     
     pure function body_get_weight(rb, g) result(w)
@@ -203,33 +211,46 @@
         current%agl = matmul(I, v%omg)
     end subroutine
     
-    pure function world_calc_rate(self, current) result(rate)
+    elemental function body_calc_rate(rb, current, f) result(rate)
+    class(rigidbody), intent(in) :: rb
+    type(state), intent(in) :: current
+    type(loading), intent(in) :: f
+    type(state) :: rate
+    type(motion) :: v
+        v = rb%motion(current)
+        ! d(r)/dt = v
+        rate%pos = v%vee
+        ! d(q)/dt = 1/2*ω*q
+        rate%ori = q_der(current%ori, v%omg)            
+        ! d(p)/dt = F
+        rate%mom = f%force
+        ! d(H)/dt = τ
+        rate%agl = f%torque        
+    end function
+    
+    function world_calc_rate(self, current) result(rate)
     class(world), intent(in) :: self
     type(state), intent(in), allocatable :: current(:)
     type(state), allocatable :: rate(:)
-    type(loading) :: f
-    type(motion) :: v
     type(rigidbody) :: rb
+    type(loading), allocatable :: fa(:)
     integer :: k, n     
     
         n = size(self%bodies)        
-        allocate(rate(n))        
-        do k=1, n
+        allocate(rate(n))
+        allocate(fa(n))
+        
+        do concurrent (k=1:n)
             rb = self%bodies(k)
-            f = rb%weight(gravity)            
-            v = rb%motion(current(k))
-                                    
-            rate(k)%pos = v%vee
-            rate(k)%ori = q_der(current(k)%ori, v%omg)
+            fa(k) = rb%weight(gravity)                        
+            rate(k) = rb%rate(current(k), fa(k))
+        end do  
+        
+        !rate = self%bodies%rate(current, fa)        
             
-            ! d(p)/dt = F
-            rate(k)%mom = f%force
-            ! d(H)/dt = τ
-            rate(k)%agl = f%torque
-        end do        
     end function
     
-    pure subroutine world_rk_step(self, h)
+    subroutine world_rk_step(self, h)
     class(world), intent(inout) :: self
     real(wp), intent(in) :: h
     type(state), allocatable :: next(:), K0(:), K1(:), K2(:), K3(:)
@@ -252,16 +273,7 @@
         self%current = self%current + (h/6)*(K0 + 2.0_wp*K1 + 2.0_wp*K2 + K3)
         
     end subroutine
-        
-    !pure function world_momentum_state(self, current) result(H)
-    !class(world), intent(in) :: self
-    !type(state), intent(in), allocatable :: current(:)    
-    !type(loading), allocatable :: H(:)
-    !integer :: n
-    !    n = size(self%bodies)
-    !    H = self%bodies%momentum(current)
-    !end function
-    
+            
     pure function world_motion_state(self, current) result(v)
     class(world), intent(in) :: self
     type(state), intent(in), allocatable :: current(:)

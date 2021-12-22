@@ -2,6 +2,8 @@
     use, intrinsic :: iso_fortran_env, only : sp=>real32, wp => real64, li => int64
     implicit none ( type, external )
     
+    integer, parameter :: dims = 3
+    
     real(wp), parameter :: nan64 =  transfer(-2251799813685248_li, 1._wp)
     real(wp), parameter :: pi = 4d0*atan(1d0), deg = pi/180d0
     reaL(wp), parameter :: o_(3) = [0d0,0d0,0d0]
@@ -9,7 +11,7 @@
     reaL(wp), parameter :: j_(3) = [0d0,1d0,0d0]
     reaL(wp), parameter :: k_(3) = [0d0,0d0,1d0]
     real(wp), parameter :: eye3(3,3) = reshape([i_,j_,k_],[3,3])
-    
+        
     interface eye
         procedure a_identity, a_elemental, v_elemental
     end interface    
