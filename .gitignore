@@ -349,3 +349,4 @@ healthchecksdb
 MigrationBackup/
 
 *.u2d
+/ipo_out.asm
