@@ -2,8 +2,6 @@
     use, intrinsic :: iso_fortran_env, only : sp=>real32, wp => real64, li => int64
     implicit none ( type, external )
     
-    integer, parameter :: dims = 3
-    
     real(wp), parameter :: nan64 =  transfer(-2251799813685248_li, 1._wp)
     real(wp), parameter :: pi = 4d0*atan(1d0), deg = pi/180d0
     reaL(wp), parameter :: o_(3) = [0d0,0d0,0d0]

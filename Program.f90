@@ -2,23 +2,30 @@
     program FortranConsoleMbd
     use mod_rigidbody
     implicit none
-
+    
+    !Parameters
+    real(wp), parameter :: gravity(3) = [0d0,-10d0,0d0]  
+    
     ! Variables
     type(world) :: sim
     integer :: i,n, steps, iter
-    real(wp) :: theta, h, t_end,fps, time
+    real(wp) :: theta, h, t_end,fps, time, ke, pe
     integer(li) :: tic,toc,rate
     type(rigidbody):: rb
+    type(motion) :: v
 
     ! Body of FortranConsoleMbd
     n = 6
     rb = body_cylinder(m=0.05_wp, r=0.02_wp, h=0.05_wp)
-    sim = world(n, rb)
+    sim = world(n, rb, gravity)    
     do i=1, n
         theta = (pi*(i-1))/(n-1)
         sim%current(i)%ori = rot(i_, pi/2) .o. rot(k_, theta)
         call rb%set_motion(sim%current(i), motion(10.0_wp * j_, 50*pi*i_ - 3*pi*k_))
     end do
+    ke = sim%ke()
+    pe = sim%pe()
+    print '(a,g0.6,a,g0.6,a,g0.6)', "Energy: KE=", ke, ", PE=", pe, ", TOT=", ke + pe
     
     t_end = 1.0_wp
     steps = 2**21
@@ -34,7 +41,12 @@
             call show_momentum(sim ,1)
         end if
     end do
-    call SYSTEM_CLOCK(toc,rate)
+    call SYSTEM_CLOCK(toc, rate)
+    
+    ke = sim%ke()
+    pe = sim%pe()
+    print '(a,g0.6,a,g0.6,a,g0.6)', "Energy: KE=", ke, ", PE=", pe, ", TOT=", ke + pe
+    
     time = dble(toc-tic)/rate
     fps = (iter*n)/time
     print '(a,i0,a,f0.1,a,f0.3)', 'iter=', iter, ', kfps=', fps/1000, ', time=', time
