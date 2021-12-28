@@ -11,28 +11,35 @@
         procedure :: set_motion => body_set_motion
         procedure :: rate => body_calc_rate
         procedure :: ke => body_calc_kinetic_energy
+        procedure, pass :: write => rb_write
+        procedure, pass :: read => rb_read
+        generic, public :: write(formatted) => write
+        generic, public :: read(formatted)  => read
     end type rigidbody
     
     type state
-        real(wp) :: pos(3), ori(4)
-        real(wp) :: mom(3), agl(3)
+        type(vector) :: pos
+        type(quaternion) :: ori
+        type(vector) :: mom, agl
     end type state
     
     type motion
-        real(wp) :: vee(3), omg(3)
+        type(vector) :: vee, omg
     end type
         
     type loading
-        real(wp) :: force(3), torque(3)
+        type(vector) :: force, torque
     end type
     
     type contact
-        real(wp) :: direction(3), impulse
-        real(wp) :: pos(3)
+        type(vector) :: direction
+        real(wp) :: impulse
+        type(vector) :: pos
     end type
     
     type world
-        real(wp) :: time, gee(3)
+        real(wp) :: time
+        type(vector) :: gee
         type(rigidbody), allocatable :: bodies(:)
         type(state), allocatable :: current(:)        
     contains
@@ -55,6 +62,10 @@
     end interface
     interface operator (*)
         procedure :: state_scale_left, state_scale_right
+    end interface
+    
+    interface show
+        procedure :: rb_show
     end interface
 
     contains
@@ -94,8 +105,7 @@
         real(wp), intent(in) :: m, r, h
         type(rigidbody) :: rb
         rb = rigidbody(m, m*[3*h**2/80+3*r**2/20, 3*h**2/80+3*r**2/20, 3*r**2/10])
-    end function
-    
+    end function    
     
     elemental function state_neg(s) result(r)
     type(state), intent(in) :: s
@@ -144,14 +154,14 @@
     pure function new_world(n,rb, gee) result(w)
     integer, intent(in) :: n
     type(rigidbody), intent(in) :: rb
-    real(wp), optional, intent(in) :: gee(3)
+    type(vector), optional, intent(in) :: gee
     type(world) :: w
     integer :: i
         w%time= 0.0_wp
         if( present(gee) ) then
             w%gee = gee
         else
-            w%gee = 0.0_wp
+            w%gee = o_
         end if
         allocate(w%current(n))
         allocate(w%bodies(n))
@@ -188,11 +198,11 @@
         I = matmul(rot, A)
     end function
     
-    pure function body_get_weight(rb, g) result(w)
+    pure function body_get_weight(rb, gee) result(w)
     class(rigidbody), intent(in) :: rb
-    real(wp), intent(in) :: g(3)
+    type(vector), intent(in) :: gee
     type(loading) :: w
-        w%force = rb%mass * g
+        w%force = rb%mass * gee
         w%torque = o_
     end function
         
@@ -327,4 +337,43 @@
         v = self%bodies%motion(current)
     end function
     
+    subroutine rb_write (rb, unit, iotype, v_list, iostat, iomsg)
+    class(rigidbody), intent(in) :: rb
+    integer, intent(in) :: unit
+    character(*), intent(in) :: iotype
+    integer, intent(in)  :: v_list(:)
+    integer, intent(out) :: iostat
+    character(*), intent(inout) :: iomsg
+    character(len=:), allocatable :: fmt
+        if( iotype == 'LISTDIRECTED' ) then
+            write (unit, *, iostat=iostat) rb%mass, rb%mmoi
+        else
+            fmt = '(a,' // iotype(3:) // ',a,' // iotype(3:) // ',a,' // iotype(3:) // ',a,' // iotype(3:) // ',a)'
+            write (unit, fmt, iostat=iostat) "[m=",rb%mass,", I=(",rb%mmoi(1),", ",rb%mmoi(2),", ",rb%mmoi(3),")]"
+        end if
+    end subroutine
+
+    subroutine rb_read (rb, unit, iotype, v_list, iostat, iomsg)
+    class(rigidbody), intent(inout) :: rb
+    integer, intent(in) :: unit
+    character(*), intent(in) :: iotype
+    integer, intent(in)  :: v_list(:)
+    integer, intent(out) :: iostat
+    character(*), intent(inout) :: iomsg
+    character(len=:), allocatable :: fmt
+        read (unit, *, iostat=iostat) rb%mass, rb%mmoi
+    end subroutine
+    
+    subroutine rb_show(label, rb, fmt)
+    character(len=*), intent(in) :: label
+    type(rigidbody), intent(in) :: rb
+    character(len=*), optional, intent(in) :: fmt
+        if(present(fmt)) then
+            print '(a,DT "' // fmt // '")', label, rb
+        else
+            print '(a,DT "g0")', label, rb
+        end if
+    end subroutine
+    
+        
     end module
