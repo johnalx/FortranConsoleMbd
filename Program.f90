@@ -2,39 +2,72 @@
     program FortranConsoleMbd
     use mod_rigidbody
     implicit none
-
+    
+    !Parameters
+    type(vector), parameter :: gravity = vector([0d0,-10d0,0d0])
+    
     ! Variables
     type(world) :: sim
-    integer :: i,n, steps, iter
-    real(wp) :: theta, h, t_end,fps, time
+    integer :: i,n, steps, iter, subset
+    real(wp) :: theta, h, t_end,fps, time, ke, pe
     integer(li) :: tic,toc,rate
     type(rigidbody):: rb
+    type(motion) :: v
+    type(state) :: current
+    type(vector) :: vee, omg
 
     ! Body of FortranConsoleMbd
     n = 6
     rb = body_cylinder(m=0.05_wp, r=0.02_wp, h=0.05_wp)
-    sim = world(n, rb)
+    
+    call show("rb=", rb, "g0.6")
+    
+    sim = world(n, rb, gravity)    
     do i=1, n
         theta = (pi*(i-1))/(n-1)
         sim%current(i)%ori = rot(i_, pi/2) .o. rot(k_, theta)
-        call rb%set_motion(sim%current(i), motion(10.0_wp * j_, 50*pi*i_ - 3*pi*k_))
+        vee = 10.0_wp * j_
+        omg = (50*pi)*i_ - (i*pi)*k_
+        call rb%set_motion(sim%current(i), motion(vee, omg))
     end do
-    
+    print *, "time=", sim%time
+    current = sim%current(1)
+    v = rb%motion(current)
+    call show("pos=", current%pos, "g0.6")
+    call show("ori=", current%ori, "g0.6")
+    call show("vee=", v%vee, "g0.6")
+    call show("omg=", v%omg, "g0.6")
+    call show("mom=", current%mom, "g0.6")
+    call show("agl=", current%agl, "g0.6")
+        
     t_end = 1.0_wp
     steps = 2**21
+    subset = steps / 2**5
     h = (t_end - sim%time)/steps
     iter = 0
     call SYSTEM_CLOCK(tic, rate)
     call show_momentum_head()
     call show_momentum(sim ,1)
+    
     do while(sim%time < t_end)
         iter = iter + 1
         call sim%integrate(h)        
-        if( mod(iter, 2**16)==0) then
+        if( mod(iter, subset)==0) then
             call show_momentum(sim ,1)
         end if
     end do
-    call SYSTEM_CLOCK(toc,rate)
+    call SYSTEM_CLOCK(toc, rate)
+    
+    print *, "time=", sim%time
+    current = sim%current(1)
+    call show("pos=", current%pos, "g0.4")
+    v = rb%motion(current)
+    call show("vee=", v%vee, "g0.4")
+    call show("omg=", v%omg, "g0.4")
+    call show("mom=", current%mom, "g0.4")
+    call show("agl=", current%agl, "g0.4")
+    
+    
     time = dble(toc-tic)/rate
     fps = (iter*n)/time
     print '(a,i0,a,f0.1,a,f0.3)', 'iter=', iter, ', kfps=', fps/1000, ', time=', time
@@ -55,7 +88,7 @@
     integer, intent(in) :: k
     type(loading) :: H
         H = loading(sim%current(k)%mom, sim%current(k)%agl)
-        print '(f7.4,1x,3(g13.3,1x),1x,3(g13.3,1x))', sim%time, H%force, H%torque
+        print '(f7.4,1x,3(g13.3,1x),1x,3(g13.3,1x))', sim%time, H%force%data, H%torque%data
     end subroutine
     
     subroutine show_pos_head()
@@ -95,7 +128,6 @@
         v = sim%bodies(k)%motion(st)
         print '(f7.4,1x,*(f13.3,1x))', sim%time, norm2(st%pos), norm2(st%ori), norm2(v%vee), norm2(v%omg)
     end subroutine
-    
-
+        
     end program FortranConsoleMbd
 
